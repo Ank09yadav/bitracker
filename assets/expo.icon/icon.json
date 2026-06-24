@@ -1,40 +1,77 @@
 {
-  "fill" : {
-    "automatic-gradient" : "extended-srgb:0.00000,0.47843,1.00000,1.00000"
+  "fill": {
+    "automatic-gradient": "extended-srgb:1.00000,0.83529,0.00000,1.00000"
   },
-  "groups" : [
+  "groups": [
     {
-      "layers" : [
+      "layers": [
         {
-          "image-name" : "expo-symbol 2.svg",
-          "name" : "expo-symbol 2",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              1.1008400065293245e-05,
-              -16.046875
-            ]
+          "name": "left-bracket",
+          "shape": {
+            "type": "path",
+            "fill-color": "extended-srgb:0.00000,0.47843,1.00000,1.00000",
+            "path": "M 90 120 L 40 170 L 90 220"
+          },
+          "stroke": {
+            "color": "extended-srgb:0.00000,0.47843,1.00000,1.00000",
+            "width": 18,
+            "line-cap": "round",
+            "line-join": "round"
           }
         },
         {
-          "image-name" : "grid.png",
-          "name" : "grid"
+          "name": "right-bracket",
+          "shape": {
+            "type": "path",
+            "fill-color": "extended-srgb:0.00000,0.47843,1.00000,1.00000",
+            "path": "M 210 120 L 260 170 L 210 220"
+          },
+          "stroke": {
+            "color": "extended-srgb:0.00000,0.47843,1.00000,1.00000",
+            "width": 18,
+            "line-cap": "round",
+            "line-join": "round"
+          }
+        },
+        {
+          "name": "lightning-bolt",
+          "shape": {
+            "type": "path",
+            "fill-color": "extended-srgb:1.00000,0.83529,0.00000,1.00000",
+            "path": "M 155 20 L 115 135 L 155 135 L 120 280 L 195 145 L 155 145 Z"
+          },
+          "stroke": {
+            "color": "extended-srgb:0.85000,0.65000,0.00000,1.00000",
+            "width": 6,
+            "line-join": "round"
+          }
         }
       ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.45,
+        "blur-radius": 12,
+        "offset": [0, 6]
       },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
+      "translucency": {
+        "enabled": true,
+        "value": 0.15
       }
     }
   ],
-  "supported-platforms" : {
-    "circles" : [
+  "canvas": {
+    "size": {
+      "width": 300,
+      "height": 300
+    },
+    "background": {
+      "transparent": true
+    }
+  },
+  "supported-platforms": {
+    "circles": [
       "watchOS"
     ],
-    "squares" : "shared"
+    "squares": "shared"
   }
 }
