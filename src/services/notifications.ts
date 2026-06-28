@@ -15,6 +15,17 @@ if (Platform.OS !== 'web') {
         shouldShowList: true,
       }),
     });
+
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync('habit-reminders', {
+        name: 'Habit Reminders',
+        importance: Notifications.AndroidImportance?.MAX ?? 4,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      }).catch((err: any) => {
+        console.warn('Failed to set Android notification channel:', err);
+      });
+    }
   } catch (error) {
     console.warn('expo-notifications failed to initialize in this environment:', error);
   }
@@ -60,11 +71,12 @@ export function parseReminderTime(timeStr: string): { hour: number; minute: numb
   }
 }
 
-// Schedule notification for a habit
+// Schedule notification for a habit based on frequency
 export async function scheduleHabitNotification(
   habitId: string,
   habitName: string,
-  timeStr: string
+  timeStr: string,
+  frequency: 'daily' | 'weekdays' | number[]
 ): Promise<string | null> {
   if (Platform.OS === 'web' || !Notifications) return null;
   
@@ -76,34 +88,82 @@ export async function scheduleHabitNotification(
     await cancelHabitNotification(habitId);
     
     const { hour, minute } = parseReminderTime(timeStr);
+    const notificationIds: string[] = [];
+
+    if (frequency === 'daily') {
+      const identifier = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Habit Reminder 🌟",
+          body: `Time for your habit: "${habitName}"! Let's keep the streak alive.`,
+          data: { habitId },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour,
+          minute,
+          channelId: 'habit-reminders',
+        } as any,
+      });
+      notificationIds.push(identifier);
+    } else if (frequency === 'weekdays') {
+      const weekdayIndices = [2, 3, 4, 5, 6]; // Mon, Tue, Wed, Thu, Fri (1-indexed, 1=Sun, 2=Mon)
+      for (const weekday of weekdayIndices) {
+        const identifier = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "Habit Reminder 🌟",
+            body: `Time for your habit: "${habitName}"! Let's keep the streak alive.`,
+            data: { habitId },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+            weekday,
+            hour,
+            minute,
+            channelId: 'habit-reminders',
+          } as any,
+        });
+        notificationIds.push(identifier);
+      }
+    } else if (Array.isArray(frequency)) {
+      const weekdayIndices = frequency.map((day) => day + 1); // convert 0-6 to 1-7
+      for (const weekday of weekdayIndices) {
+        const identifier = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "Habit Reminder 🌟",
+            body: `Time for your habit: "${habitName}"! Let's keep the streak alive.`,
+            data: { habitId },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+            weekday,
+            hour,
+            minute,
+            channelId: 'habit-reminders',
+          } as any,
+        });
+        notificationIds.push(identifier);
+      }
+    }
     
-    const identifier = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Habit Reminder 🌟",
-        body: `Time for your habit: "${habitName}"! Let's keep the streak alive.`,
-        data: { habitId },
-      },
-      trigger: {
-        type: 'calendar',
-        hour,
-        minute,
-        repeats: true,
-      } as any,
-    });
-    
-    return identifier;
+    return notificationIds.length > 0 ? notificationIds.join(',') : null;
   } catch (error) {
     console.error('Failed to schedule notification:', error);
     return null;
   }
 }
 
-// Cancel a scheduled notification
+// Cancel scheduled notifications (supports comma-separated list of IDs)
 export async function cancelHabitNotification(notificationId: string | null): Promise<void> {
   if (Platform.OS === 'web' || !Notifications || !notificationId) return;
   
   try {
-    await Notifications.cancelScheduledNotificationAsync(notificationId);
+    const ids = notificationId.split(',');
+    for (const id of ids) {
+      const trimmedId = id.trim();
+      if (trimmedId) {
+        await Notifications.cancelScheduledNotificationAsync(trimmedId);
+      }
+    }
   } catch (error) {
     console.error('Failed to cancel notification:', error);
   }

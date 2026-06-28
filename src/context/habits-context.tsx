@@ -158,7 +158,7 @@ function buildSeedHistory(
   progressData: Record<number, number> = {}
 ): Record<string, HabitProgress> {
   const history: Record<string, HabitProgress> = {};
-  const today = new Date('2026-06-24'); // Match context local date in screenshots
+  const today = new Date();
 
   const isScheduled = (d: Date) => {
     const day = d.getDay();
@@ -205,13 +205,12 @@ const getInitialHabits = (): Habit[] => [
     reminderTime: '09:00 AM',
     progressTarget: 8,
     progressUnit: 'glasses',
-    createdAt: '2026-05-01T00:00:00Z',
+    createdAt: new Date().toISOString(),
     notificationId: null,
-    // Streak 7 days (today is June 24, incomplete). Completed offset 1 to 7 (June 23 to June 17)
-    // June 24 (today) is offset 0: progress 6, completed false.
+    // Streak 7 days (today is incomplete). Completed offset 1 to 7
     history: {
       ...buildSeedHistory('daily', [1, 2, 3, 4, 5, 6, 7], { 1: 8, 2: 8, 3: 8, 4: 8, 5: 8, 6: 8, 7: 8 }),
-      '2026-06-24': { progress: 6, completed: false }
+      [getLocalDateString()]: { progress: 6, completed: false }
     }
   },
   {
@@ -223,10 +222,9 @@ const getInitialHabits = (): Habit[] => [
     reminderTime: '07:30 PM',
     progressTarget: 1,
     progressUnit: 'hour',
-    createdAt: '2026-05-01T00:00:00Z',
+    createdAt: new Date().toISOString(),
     notificationId: null,
-    // Streak 12 days. Today (June 24, Tue) is completed. Weekday completed offsets:
-    // 0 (June 24 Tue), 1 (June 23 Mon), 4 (June 20 Fri), 5 (June 19 Thu), 6 (June 18 Wed), 7 (June 17 Tue), 8 (June 16 Mon), 11 (June 13 Fri), 12 (June 12 Thu), 13 (June 11 Wed), 14 (June 10 Tue), 15 (June 9 Mon).
+    // Streak 12 days. Today is completed.
     history: buildSeedHistory('weekdays', [0, 1, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15], {
       0: 1, 1: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1
     })
@@ -240,13 +238,12 @@ const getInitialHabits = (): Habit[] => [
     reminderTime: '10:00 PM',
     progressTarget: 30,
     progressUnit: 'min',
-    createdAt: '2026-05-01T00:00:00Z',
+    createdAt: new Date().toISOString(),
     notificationId: null,
-    // Streak 4 days. Today is June 24, completed manually (18/30 completed).
-    // Completed offsets: 0 (June 24), 1 (June 23), 2 (June 22), 3 (June 21). Offset 4 (June 20) missed.
+    // Streak 4 days. Today is completed manually.
     history: {
       ...buildSeedHistory('daily', [0, 1, 2, 3], { 1: 30, 2: 30, 3: 30 }),
-      '2026-06-24': { progress: 18, completed: true }
+      [getLocalDateString()]: { progress: 18, completed: true }
     }
   },
   {
@@ -258,16 +255,14 @@ const getInitialHabits = (): Habit[] => [
     reminderTime: '06:30 AM',
     progressTarget: 45,
     progressUnit: 'min',
-    createdAt: '2026-05-01T00:00:00Z',
+    createdAt: new Date().toISOString(),
     notificationId: null,
-    // Streak 9 days. Today (June 24, Tue) is incomplete/unscheduled, so streak starts from yesterday (June 23 Mon).
-    // Mon, Wed, Fri completed offsets:
-    // 1 (June 23 Mon), 4 (June 20 Fri), 6 (June 18 Wed), 8 (June 16 Mon), 11 (June 13 Fri), 13 (June 11 Wed), 15 (June 9 Mon), 18 (June 6 Fri), 20 (June 4 Wed).
+    // Streak 9 days. Today is incomplete/unscheduled.
     history: {
       ...buildSeedHistory([1, 3, 5], [1, 4, 6, 8, 11, 13, 15, 18, 20], {
         1: 45, 4: 45, 6: 45, 8: 45, 11: 45, 13: 45, 15: 45, 18: 45, 20: 45
       }),
-      '2026-06-24': { progress: 0, completed: false }
+      [getLocalDateString()]: { progress: 0, completed: false }
     }
   }
 ];
@@ -353,7 +348,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     
     let notificationId: string | null = null;
     if (settings.notifications.reminders) {
-      notificationId = await scheduleHabitNotification(id, habitData.name, habitData.reminderTime);
+      notificationId = await scheduleHabitNotification(id, habitData.name, habitData.reminderTime, habitData.frequency);
     }
 
     const newHabit: Habit = {
@@ -374,14 +369,14 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         if (habit.id === id) {
           const merged = { ...habit, ...updatedFields };
           
-          // Re-schedule notifications if reminderTime changed or name changed
+          // Re-schedule notifications if reminderTime, frequency or name changed
           let notificationId = habit.notificationId;
           if (
             settings.notifications.reminders &&
-            (updatedFields.reminderTime !== undefined || updatedFields.name !== undefined)
+            (updatedFields.reminderTime !== undefined || updatedFields.name !== undefined || updatedFields.frequency !== undefined)
           ) {
             await cancelHabitNotification(habit.notificationId);
-            notificationId = await scheduleHabitNotification(id, merged.name, merged.reminderTime);
+            notificationId = await scheduleHabitNotification(id, merged.name, merged.reminderTime, merged.frequency);
           }
 
           return { ...merged, notificationId };
@@ -471,7 +466,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         // Schedule for all
         const updatedHabits = await Promise.all(
           habits.map(async (h) => {
-            const notifId = await scheduleHabitNotification(h.id, h.name, h.reminderTime);
+            const notifId = await scheduleHabitNotification(h.id, h.name, h.reminderTime, h.frequency);
             return { ...h, notificationId: notifId };
           })
         );

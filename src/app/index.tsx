@@ -7,8 +7,7 @@ import {
   Modal,
   TextInput,
   TouchableOpacity,
-  Platform,
-  useColorScheme
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -18,13 +17,18 @@ import Svg, { Circle } from 'react-native-svg';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useActiveColorScheme } from '@/hooks/use-theme';
 import { useHabits, getLocalDateString, isHabitScheduledOnDate, calculateStreak } from '@/context/habits-context';
 
 export default function TodayScreen() {
-  const { habits, settings, toggleHabitComplete, updateHabitProgress } = useHabits();
+  const { habits, settings, toggleHabitComplete, updateHabitProgress, updateSettings } = useHabits();
   const theme = useTheme();
-  const scheme = useColorScheme();
+  const scheme = useActiveColorScheme();
+  
+  const handleToggleTheme = () => {
+    const nextTheme = settings.theme === 'light' ? 'dark' : 'light';
+    updateSettings({ theme: nextTheme });
+  };
   
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
   const [progressInput, setProgressInput] = useState<string>('');
@@ -96,10 +100,23 @@ export default function TodayScreen() {
               {getFormattedDate()}
             </ThemedText>
           </View>
-          <Image
-            source={{ uri: settings.profile.avatar }}
-            style={styles.avatar}
-          />
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleToggleTheme}
+              style={[styles.themeToggleBtn, { backgroundColor: theme.backgroundElement }]}
+            >
+              <SymbolView
+                name={scheme === 'dark' ? 'sun.max.fill' : 'moon.fill'}
+                tintColor={theme.text}
+                size={20}
+              />
+            </TouchableOpacity>
+            <Image
+              source={{ uri: settings.profile.avatar }}
+              style={styles.avatar}
+            />
+          </View>
         </View>
 
         <ScrollView
@@ -326,6 +343,20 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  themeToggleBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(148, 163, 184, 0.1)',
   },
   scrollContent: {
     paddingHorizontal: Spacing.four,

@@ -5,8 +5,7 @@ import {
   View,
   Modal,
   TextInput,
-  TouchableOpacity,
-  useColorScheme
+  TouchableOpacity
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
@@ -14,7 +13,7 @@ import { SymbolView } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useActiveColorScheme } from '@/hooks/use-theme';
 import { useHabits, getLocalDateString, calculateStreak, Habit } from '@/context/habits-context';
 
 const EMOJI_OPTIONS = ['💧', '💻', '📖', '🏋️‍♂️', '🍎', '🧘', '😴', '🧠', '☀️', '🚶‍♂️', '🎵', '🥗'];
@@ -24,7 +23,7 @@ const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export default function HabitsScreen() {
   const { habits, addHabit, updateHabit, deleteHabit } = useHabits();
   const theme = useTheme();
-  const scheme = useColorScheme();
+  const scheme = useActiveColorScheme();
   const todayStr = getLocalDateString();
 
   // Add Habit Form State

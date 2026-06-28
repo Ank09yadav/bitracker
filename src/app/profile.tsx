@@ -7,8 +7,7 @@ import {
   Modal,
   TextInput,
   TouchableOpacity,
-  Platform,
-  useColorScheme
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -17,13 +16,13 @@ import { SymbolView } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useActiveColorScheme } from '@/hooks/use-theme';
 import { useHabits } from '@/context/habits-context';
 
 export default function ProfileScreen() {
   const { settings, updateSettings, updateProfile, habits } = useHabits();
   const theme = useTheme();
-  const scheme = useColorScheme();
+  const scheme = useActiveColorScheme();
 
   // Edit Profile Modal
   const [profileModalVisible, setProfileModalVisible] = useState(false);

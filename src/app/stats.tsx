@@ -20,7 +20,7 @@ export default function StatsScreen() {
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('week');
   
   const todayStr = getLocalDateString();
-  const todayDate = new Date('2026-06-24'); // Center around today date
+  const todayDate = new Date(); // Center around today date
 
   // Helper to format Date as YYYY-MM-DD
   const formatDateString = (d: Date) => {
@@ -155,12 +155,18 @@ export default function StatsScreen() {
     weeklyChartData.push({ dayName, rate: rate || (i === 1 ? 95 : i === 3 ? 40 : 80) }); // Seed if data is low
   }
 
-  // 6. Heatmap Calendar (Grid for current month: June 2026)
-  // June 2026 starts on Monday (1) and has 30 days.
+  // 6. Heatmap Calendar (Grid for current month)
   const heatmapDays: { dayNum: number; dateStr: string; rate: number; isToday: boolean }[] = [];
-  const daysInJune = 30;
-  for (let dayNum = 1; dayNum <= daysInJune; dayNum++) {
-    const d = new Date(2026, 5, dayNum); // June is index 5
+  const currentYearNum = todayDate.getFullYear();
+  const currentMonthNum = todayDate.getMonth();
+  const daysInMonth = new Date(currentYearNum, currentMonthNum + 1, 0).getDate();
+  
+  // Calculate starting offset (Mon=0, Tue=1 ... Sun=6)
+  const startDayOfWeek = new Date(currentYearNum, currentMonthNum, 1).getDay();
+  const offsetDays = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+
+  for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+    const d = new Date(currentYearNum, currentMonthNum, dayNum);
     const dateStr = formatDateString(d);
     
     let scheduled = 0;
@@ -175,11 +181,15 @@ export default function StatsScreen() {
     });
 
     const rate = scheduled > 0 ? completed / scheduled : 0;
+    const isToday = d.getFullYear() === todayDate.getFullYear() &&
+                    d.getMonth() === todayDate.getMonth() &&
+                    d.getDate() === todayDate.getDate();
+
     heatmapDays.push({
       dayNum,
       dateStr,
       rate,
-      isToday: dayNum === 24,
+      isToday,
     });
   }
 
@@ -342,7 +352,7 @@ export default function StatsScreen() {
               <View>
                 <ThemedText style={styles.sectionTitle}>Monthly Heatmap</ThemedText>
                 <ThemedText themeColor="textSecondary" style={styles.sectionSubTitle}>
-                  Completed vs missed days
+                  {`Completed vs missed days • ${todayDate.toLocaleString('en-US', { month: 'long', year: 'numeric' })}`}
                 </ThemedText>
               </View>
               <SymbolView name="calendar" tintColor={theme.textSecondary} size={16} />
@@ -358,7 +368,10 @@ export default function StatsScreen() {
                 ))}
               </View>
               <View style={styles.calendarDaysContainer}>
-                {/* Seed blank cells for offset (June 2026 starts on Mon, so no empty cells needed!) */}
+                {/* Blank cells for weekday offset alignment */}
+                {Array.from({ length: offsetDays }).map((_, idx) => (
+                  <View key={`empty-${idx}`} style={[styles.calendarCell, { backgroundColor: 'transparent' }]} />
+                ))}
                 {heatmapDays.map((day) => {
                   let cellBg = 'rgba(148, 163, 184, 0.08)';
                   if (day.rate > 0) {
