@@ -91,7 +91,7 @@ export default function StatsScreen() {
     });
   });
 
-  if (completedThisMonth === 0) {
+  if (habits.length > 0 && completedThisMonth === 0) {
     completedThisMonth = 124; // Mockup fallback
   }
 
@@ -130,7 +130,7 @@ export default function StatsScreen() {
     }
   }
   const bestDayName = DAYS_SHORT[bestDayIndex];
-  const bestDayRatePct = maxDayRate > 0 ? Math.round(maxDayRate * 100) : 94;
+  const bestDayRatePct = maxDayRate > 0 ? Math.round(maxDayRate * 100) : (habits.length > 0 ? 94 : 0);
 
   // 5. Weekly Completion Chart Data (Last 7 days)
   const weeklyChartData: { dayName: string; rate: number }[] = [];
@@ -152,7 +152,7 @@ export default function StatsScreen() {
 
     const rate = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0;
     const dayName = DAYS_SHORT[d.getDay()];
-    weeklyChartData.push({ dayName, rate: rate || (i === 1 ? 95 : i === 3 ? 40 : 80) }); // Seed if data is low
+    weeklyChartData.push({ dayName, rate: habits.length > 0 ? (rate || (i === 1 ? 95 : i === 3 ? 40 : 80)) : 0 }); // Seed if data is low
   }
 
   // 6. Heatmap Calendar (Grid for current month)
@@ -300,7 +300,7 @@ export default function StatsScreen() {
                 </ThemedText>
                 <SymbolView name="crown" tintColor="#eab308" size={14} />
               </View>
-              <ThemedText style={styles.statValue}>{bestDayName}</ThemedText>
+              <ThemedText style={styles.statValue}>{habits.length > 0 ? bestDayName : 'N/A'}</ThemedText>
               <ThemedText themeColor="textSecondary" style={styles.statSubText}>
                 {bestDayRatePct}% completion
               </ThemedText>
@@ -373,13 +373,9 @@ export default function StatsScreen() {
                   <View key={`empty-${idx}`} style={[styles.calendarCell, { backgroundColor: 'transparent' }]} />
                 ))}
                 {heatmapDays.map((day) => {
-                  let cellBg = 'rgba(148, 163, 184, 0.08)';
-                  if (day.rate > 0) {
-                    if (day.rate <= 0.3) cellBg = '#bbf7d0'; // Light Green
-                    else if (day.rate <= 0.7) cellBg = '#4ade80'; // Medium Green
-                    else cellBg = '#10b981'; // Dark Green
-                  } else if (day.dayNum < 24) {
-                    cellBg = 'rgba(239, 68, 68, 0.06)'; // Light red/grey missed
+                  let cellBg: string = theme.backgroundElement;
+                  if (day.rate === 1) {
+                    cellBg = '#10b981'; // Green for perfect completed day
                   }
                   
                   return (
@@ -388,14 +384,14 @@ export default function StatsScreen() {
                       style={[
                         styles.calendarCell,
                         { backgroundColor: cellBg },
-                        day.isToday && styles.todayCell,
+                        day.isToday && { borderWidth: 2, borderColor: theme.text },
                       ]}
                     >
                       <ThemedText
                         style={[
                           styles.calendarCellText,
-                          day.rate > 0 && { color: '#064e3b', fontWeight: '700' },
-                          day.isToday && { color: '#ffffff', fontWeight: '800' },
+                          day.rate === 1 ? { color: '#ffffff', fontWeight: '700' } : { color: theme.textSecondary },
+                          day.isToday && { color: theme.text, fontWeight: '800' },
                         ]}
                       >
                         {day.dayNum}
@@ -407,14 +403,12 @@ export default function StatsScreen() {
             </View>
 
             <View style={styles.heatmapLegend}>
-              <ThemedText themeColor="textSecondary" style={styles.legendText}>Missed</ThemedText>
+              <ThemedText themeColor="textSecondary" style={styles.legendText}>Missed / Incomplete</ThemedText>
               <View style={styles.legendDotsRow}>
-                <View style={[styles.legendDot, { backgroundColor: 'rgba(148, 163, 184, 0.08)' }]} />
-                <View style={[styles.legendDot, { backgroundColor: '#bbf7d0' }]} />
-                <View style={[styles.legendDot, { backgroundColor: '#4ade80' }]} />
+                <View style={[styles.legendDot, { backgroundColor: theme.backgroundElement, borderWidth: 1, borderColor: theme.backgroundSelected }]} />
                 <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
               </View>
-              <ThemedText themeColor="textSecondary" style={styles.legendText}>Completed</ThemedText>
+              <ThemedText themeColor="textSecondary" style={styles.legendText}>Perfect Day</ThemedText>
             </View>
           </ThemedView>
 

@@ -77,15 +77,12 @@ export async function scheduleHabitNotification(
   habitName: string,
   timeStr: string,
   frequency: 'daily' | 'weekdays' | number[]
-): Promise<string | null> {
-  if (Platform.OS === 'web' || !Notifications) return null;
+): Promise<string[]> {
+  if (Platform.OS === 'web' || !Notifications) return [];
   
   try {
     const hasPermission = await requestNotificationPermissions();
-    if (!hasPermission) return null;
-    
-    // First, cancel any existing notification for this habit (just in case)
-    await cancelHabitNotification(habitId);
+    if (!hasPermission) return [];
     
     const { hour, minute } = parseReminderTime(timeStr);
     const notificationIds: string[] = [];
@@ -125,7 +122,7 @@ export async function scheduleHabitNotification(
         notificationIds.push(identifier);
       }
     } else if (Array.isArray(frequency)) {
-      const weekdayIndices = frequency.map((day) => day + 1); // convert 0-6 to 1-7
+      const weekdayIndices = frequency.map((day) => day + 1); // convert 0-6 to 1-7 (Sun=1, Mon=2...)
       for (const weekday of weekdayIndices) {
         const identifier = await Notifications.scheduleNotificationAsync({
           content: {
@@ -145,21 +142,24 @@ export async function scheduleHabitNotification(
       }
     }
     
-    return notificationIds.length > 0 ? notificationIds.join(',') : null;
+    return notificationIds;
   } catch (error) {
     console.error('Failed to schedule notification:', error);
-    return null;
+    return [];
   }
 }
 
-// Cancel scheduled notifications (supports comma-separated list of IDs)
-export async function cancelHabitNotification(notificationId: string | null): Promise<void> {
-  if (Platform.OS === 'web' || !Notifications || !notificationId) return;
+// Cancel scheduled notifications (supports string array or comma-separated list of IDs)
+export async function cancelHabitNotification(notificationIds: string[] | string | null): Promise<void> {
+  if (Platform.OS === 'web' || !Notifications || !notificationIds) return;
   
   try {
-    const ids = notificationId.split(',');
+    const ids = Array.isArray(notificationIds)
+      ? notificationIds
+      : notificationIds.split(',');
+
     for (const id of ids) {
-      const trimmedId = id.trim();
+      const trimmedId = id?.trim();
       if (trimmedId) {
         await Notifications.cancelScheduledNotificationAsync(trimmedId);
       }

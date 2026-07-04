@@ -5,16 +5,19 @@ import {
   View,
   Modal,
   TextInput,
-  TouchableOpacity
+  TouchableOpacity,
+  Platform,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SymbolView } from 'expo-symbols';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme, useActiveColorScheme } from '@/hooks/use-theme';
-import { useHabits, getLocalDateString, calculateStreak, Habit } from '@/context/habits-context';
+import { useHabits, getLocalDateString, Habit } from '@/context/habits-context';
 
 const EMOJI_OPTIONS = ['💧', '💻', '📖', '🏋️‍♂️', '🍎', '🧘', '😴', '🧠', '☀️', '🚶‍♂️', '🎵', '🥗'];
 const COLOR_OPTIONS = ['#0ea5e9', '#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#f97316', '#14b8a6'];
@@ -24,9 +27,15 @@ export default function HabitsScreen() {
   const { habits, addHabit, updateHabit, deleteHabit } = useHabits();
   const theme = useTheme();
   const scheme = useActiveColorScheme();
+  const router = useRouter();
   const todayStr = getLocalDateString();
 
-  // Add Habit Form State
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'daily' | 'weekdays' | 'custom'>('all');
+
+  // Create Habit Modal State
+  const [createModalVisible, setCreateModalVisible] = useState(false);
   const [name, setName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('💧');
   const [selectedColor, setSelectedColor] = useState('#0ea5e9');
@@ -73,6 +82,8 @@ export default function HabitsScreen() {
     setReminderTime('09:00 AM');
     setProgressTarget('8');
     setProgressUnit('glasses');
+    
+    setCreateModalVisible(false);
   };
 
   const handleStartEdit = (habit: Habit) => {
@@ -105,10 +116,31 @@ export default function HabitsScreen() {
       frequency,
       reminderTime: editReminderTime,
       progressTarget: parseInt(editProgressTarget, 10) || 1,
-      progressUnit: editProgressUnit,
+      progressUnit: editProgressUnit.trim() || 'times',
     });
 
     setEditingHabit(null);
+  };
+
+  const handleDelete = (habit: Habit) => {
+    const performDelete = async () => {
+      await deleteHabit(habit.id);
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm(`Are you sure you want to delete "${habit.name}"? This cannot be undone.`)) {
+        performDelete();
+      }
+    } else {
+      Alert.alert(
+        'Delete Habit',
+        `Are you sure you want to delete "${habit.name}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: performDelete },
+        ]
+      );
+    }
   };
 
   const toggleCustomDay = (dayIndex: number) => {
@@ -127,24 +159,85 @@ export default function HabitsScreen() {
     }
   };
 
-  const getFreqLabel = (habit: Habit) => {
-    if (habit.frequency === 'daily') return 'Daily';
-    if (habit.frequency === 'weekdays') return 'Mon–Fri';
-    return habit.frequency.map((d) => DAYS_OF_WEEK[d]).join(', ');
+  const getFreqLabel = (h: Habit) => {
+    if (h.frequency === 'daily') return 'Daily';
+    if (h.frequency === 'weekdays') return 'Mon–Fri';
+    return h.frequency.map((d) => DAYS_OF_WEEK[d]).join(', ');
   };
+
+  // Filter Habits list
+  const filteredHabits = habits.filter((h) => {
+    const matchesSearch = h.name.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'daily') return h.frequency === 'daily';
+    if (activeFilter === 'weekdays') return h.frequency === 'weekdays';
+    if (activeFilter === 'custom') return Array.isArray(h.frequency);
+    return true;
+  });
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        {/* Header */}
         <View style={styles.header}>
           <View>
             <ThemedText type="subtitle" style={styles.title}>
-              Habits
+              Habits Catalog
             </ThemedText>
             <ThemedText themeColor="textSecondary" style={styles.subtitle}>
-              Manage your daily routines and reminders
+              Manage and customize your routines
             </ThemedText>
           </View>
+        </View>
+
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <ThemedView type="backgroundElement" style={styles.searchBar}>
+            <Ionicons name="search" size={18} color={theme.textSecondary} style={{ marginRight: Spacing.two }} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.text }]}
+              placeholder="Search habits..."
+              placeholderTextColor={theme.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </ThemedView>
+        </View>
+
+        {/* Filter Chips */}
+        <View style={styles.filterChipsScroll}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScrollContent}>
+            {(['all', 'daily', 'weekdays', 'custom'] as const).map((filter) => {
+              const isActive = activeFilter === filter;
+              const label = filter.charAt(0).toUpperCase() + filter.slice(1);
+              return (
+                <TouchableOpacity
+                  key={filter}
+                  onPress={() => setActiveFilter(filter)}
+                  style={[
+                    styles.filterChip,
+                    isActive ? [styles.filterChipActive, { backgroundColor: theme.text }] : { backgroundColor: theme.backgroundElement }
+                  ]}
+                >
+                  <ThemedText 
+                    style={[
+                      styles.filterChipText, 
+                      { color: isActive ? theme.background : theme.textSecondary }
+                    ]}
+                  >
+                    {label}
+                  </ThemedText>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
 
         <ScrollView
@@ -153,30 +246,34 @@ export default function HabitsScreen() {
         >
           {/* Habits list */}
           <View style={styles.listContainer}>
-            {habits.map((habit) => {
-              const { currentStreak } = calculateStreak(habit, todayStr);
+            {filteredHabits.map((habit) => {
+              const currentStreak = habit.streakCount ?? 0;
+              const todayRecord = habit.history[todayStr] || { progress: 0, completed: false };
+              const progressPct = Math.min(100, Math.round((todayRecord.progress / habit.progressTarget) * 100));
+
               return (
-                <View
+                <TouchableOpacity
                   key={habit.id}
+                  activeOpacity={0.9}
+                  onPress={() => router.navigate(`/habit/${habit.id}` as any)}
                   style={[
                     styles.habitCard,
                     { backgroundColor: scheme === 'dark' ? '#1c1d20' : '#f8f9fa' }
                   ]}
                 >
-                  <View style={styles.cardMainRow}>
+                  <View style={styles.cardHeaderRow}>
                     <View style={[styles.iconWrapper, { backgroundColor: habit.color + '15' }]}>
                       <ThemedText style={styles.emojiText}>{habit.icon}</ThemedText>
                     </View>
                     <View style={styles.habitMeta}>
-                      <ThemedText style={styles.habitName}>{habit.name}</ThemedText>
+                      <ThemedText style={styles.habitName} numberOfLines={1}>{habit.name}</ThemedText>
                       <View style={styles.freqRow}>
+                        <Ionicons name="calendar-outline" color={theme.textSecondary} size={11} />
                         <ThemedText themeColor="textSecondary" style={styles.freqText}>
                           {getFreqLabel(habit)}
                         </ThemedText>
-                        <ThemedText themeColor="textSecondary" style={styles.bullet}>
-                          •
-                        </ThemedText>
-                        <SymbolView name="alarm" tintColor={theme.textSecondary} size={12} />
+                        <ThemedText themeColor="textSecondary" style={styles.bullet}>•</ThemedText>
+                        <Ionicons name="time-outline" color={theme.textSecondary} size={11} />
                         <ThemedText themeColor="textSecondary" style={styles.freqText}>
                           {habit.reminderTime}
                         </ThemedText>
@@ -184,96 +281,118 @@ export default function HabitsScreen() {
                     </View>
                   </View>
 
-                  <View style={styles.streakIndicator}>
-                    <SymbolView name="flame.fill" tintColor="#f97316" size={14} />
-                    <ThemedText style={styles.streakLabel}>Current streak</ThemedText>
-                    <ThemedText style={styles.streakValue}>{currentStreak} days</ThemedText>
+                  {/* Progress Bar */}
+                  <View style={styles.cardProgressSection}>
+                    <View style={styles.progressLabelRow}>
+                      <ThemedText type="small" themeColor="textSecondary">{"Today's Goal"}</ThemedText>
+                      <ThemedText type="smallBold" style={{ color: habit.color }}>
+                        {todayRecord.progress}/{habit.progressTarget} {habit.progressUnit}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.progressBarBg}>
+                      <View style={[styles.progressBarFill, { backgroundColor: habit.color, width: `${progressPct}%` }]} />
+                    </View>
                   </View>
 
-                  <View style={styles.actionRow}>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Swipe left to delete
-                    </ThemedText>
+                  <View style={styles.cardFooter}>
+                    <View style={styles.streakIndicator}>
+                      <Ionicons name="flame" color="#f97316" size={14} />
+                      <ThemedText style={styles.streakLabel}>Streak: {currentStreak} days</ThemedText>
+                    </View>
+                    
                     <View style={styles.buttonsGroup}>
                       <TouchableOpacity
-                        onPress={() => handleStartEdit(habit)}
-                        style={styles.actionButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleStartEdit(habit);
+                        }}
+                        style={[styles.actionButton, { borderColor: theme.backgroundSelected }]}
                       >
-                        <SymbolView name="pencil" tintColor={theme.text} size={14} />
-                        <ThemedText style={styles.actionBtnText}>Edit</ThemedText>
+                        <Ionicons name="pencil" color={theme.text} size={13} />
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        onPress={() => deleteHabit(habit.id)}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleDelete(habit);
+                        }}
                         style={[styles.actionButton, styles.deleteButton]}
                       >
-                        <SymbolView name="trash" tintColor="#ef4444" size={14} />
-                        <ThemedText style={[styles.actionBtnText, { color: '#ef4444' }]}>Delete</ThemedText>
+                        <Ionicons name="trash" color="#ef4444" size={13} />
                       </TouchableOpacity>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
-          </View>
 
-          {/* Add a new habit form */}
-          <ThemedView type="backgroundElement" style={styles.formCard}>
-            <View style={styles.formHeader}>
-              <View>
-                <ThemedText style={styles.formTitle}>Add a new habit</ThemedText>
-                <ThemedText themeColor="textSecondary" style={styles.formSubTitle}>
-                  Name, icon, frequency, and reminders
+            {/* Empty State */}
+            {filteredHabits.length === 0 && (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="clipboard-outline" color={theme.textSecondary} size={48} />
+                <ThemedText style={styles.emptyTitle}>
+                  {habits.length === 0 ? 'No habits yet' : 'No matches found'}
                 </ThemedText>
+                <ThemedText themeColor="textSecondary" style={styles.emptySubtitle}>
+                  {habits.length === 0 
+                    ? 'Start building positive routines by creating your first habit.'
+                    : 'Try checking your search spelling or change your active filters.'}
+                </ThemedText>
+                {habits.length === 0 && (
+                  <TouchableOpacity
+                    style={[styles.emptyCTA, { backgroundColor: theme.text }]}
+                    onPress={() => setCreateModalVisible(true)}
+                  >
+                    <ThemedText style={[styles.emptyCTAText, { color: theme.background }]}>
+                      Create First Habit
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
               </View>
-              <TouchableOpacity onPress={handleCreateHabit} style={styles.fabPlus}>
-                <SymbolView name="plus" tintColor="#ffffff" size={20} />
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Floating Action Button (FAB) */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[styles.fab, { backgroundColor: theme.text }]}
+          onPress={() => setCreateModalVisible(true)}
+        >
+          <Ionicons name="add" size={24} color={theme.background} />
+        </TouchableOpacity>
+      </SafeAreaView>
+
+      {/* Create Habit Modal */}
+      <Modal
+        visible={createModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCreateModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <ThemedView type="background" style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>New Habit</ThemedText>
+              <TouchableOpacity onPress={() => setCreateModalVisible(false)}>
+                <Ionicons name="close-circle" color={theme.textSecondary} size={26} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.inputsGrid}>
-              {/* Row 1: Name & Target */}
-              <View style={styles.formRow}>
-                <View style={styles.inputWrapper}>
-                  <ThemedText themeColor="textSecondary" style={styles.inputLabel}>
-                    🏷️ Name
-                  </ThemedText>
-                  <TextInput
-                    style={[styles.textInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
-                    placeholder="Drink Water, workout..."
-                    placeholderTextColor={theme.textSecondary}
-                    value={name}
-                    onChangeText={setName}
-                  />
-                </View>
-
-                <View style={styles.inputWrapper}>
-                  <ThemedText themeColor="textSecondary" style={styles.inputLabel}>
-                    🎯 Target Goal
-                  </ThemedText>
-                  <View style={styles.targetRow}>
-                    <TextInput
-                      style={[styles.textInput, styles.targetValueInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
-                      keyboardType="number-pad"
-                      value={progressTarget}
-                      onChangeText={setProgressTarget}
-                    />
-                    <TextInput
-                      style={[styles.textInput, styles.targetUnitInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
-                      placeholder="unit"
-                      placeholderTextColor={theme.textSecondary}
-                      value={progressUnit}
-                      onChangeText={setProgressUnit}
-                    />
-                  </View>
-                </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalInputWrapper}>
+                <ThemedText style={styles.modalInputLabel}>HABIT NAME</ThemedText>
+                <TextInput
+                  style={[styles.modalTextInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
+                  placeholder="Drink water, read a book..."
+                  placeholderTextColor={theme.textSecondary}
+                  value={name}
+                  onChangeText={setName}
+                />
               </View>
 
-              {/* Row 2: Emoji selection */}
-              <View style={styles.emojiColorSection}>
-                <ThemedText themeColor="textSecondary" style={styles.inputLabel}>
-                  😀 Select Emoji & Color
-                </ThemedText>
+              <View style={styles.modalInputWrapper}>
+                <ThemedText style={styles.modalInputLabel}>ICON & COLOR</ThemedText>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
                   {EMOJI_OPTIONS.map((emoji) => (
                     <TouchableOpacity
@@ -304,11 +423,27 @@ export default function HabitsScreen() {
                 </View>
               </View>
 
-              {/* Row 3: Frequency settings */}
-              <View style={styles.inputWrapper}>
-                <ThemedText themeColor="textSecondary" style={styles.inputLabel}>
-                  🗓️ Frequency
-                </ThemedText>
+              <View style={styles.modalInputWrapper}>
+                <ThemedText style={styles.modalInputLabel}>GOAL TARGET & UNIT</ThemedText>
+                <View style={styles.targetRow}>
+                  <TextInput
+                    style={[styles.modalTextInput, styles.targetValueInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
+                    keyboardType="number-pad"
+                    value={progressTarget}
+                    onChangeText={setProgressTarget}
+                  />
+                  <TextInput
+                    style={[styles.modalTextInput, styles.targetUnitInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
+                    placeholder="glasses, mins, etc."
+                    placeholderTextColor={theme.textSecondary}
+                    value={progressUnit}
+                    onChangeText={setProgressUnit}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalInputWrapper}>
+                <ThemedText style={styles.modalInputLabel}>FREQUENCY</ThemedText>
                 <View style={styles.segmentedControl}>
                   {(['daily', 'weekdays', 'custom'] as const).map((type) => (
                     <TouchableOpacity
@@ -360,23 +495,27 @@ export default function HabitsScreen() {
                 )}
               </View>
 
-              {/* Row 4: Reminder time */}
-              <View style={styles.inputWrapper}>
-                <ThemedText themeColor="textSecondary" style={styles.inputLabel}>
-                  ⏰ Reminder Time
-                </ThemedText>
+              <View style={styles.modalInputWrapper}>
+                <ThemedText style={styles.modalInputLabel}>REMINDER TIME</ThemedText>
                 <TextInput
-                  style={[styles.textInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
+                  style={[styles.modalTextInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="e.g. 09:00 AM"
                   placeholderTextColor={theme.textSecondary}
                   value={reminderTime}
                   onChangeText={setReminderTime}
                 />
               </View>
-            </View>
+
+              <TouchableOpacity
+                style={[styles.modalSaveButton, { backgroundColor: selectedColor }]}
+                onPress={handleCreateHabit}
+              >
+                <ThemedText style={styles.saveBtnText}>Create Habit</ThemedText>
+              </TouchableOpacity>
+            </ScrollView>
           </ThemedView>
-        </ScrollView>
-      </SafeAreaView>
+        </View>
+      </Modal>
 
       {/* Edit Habit Modal */}
       {editingHabit && (
@@ -391,13 +530,13 @@ export default function HabitsScreen() {
               <View style={styles.modalHeader}>
                 <ThemedText style={styles.modalTitle}>Edit Habit</ThemedText>
                 <TouchableOpacity onPress={() => setEditingHabit(null)}>
-                  <SymbolView name="xmark.circle.fill" tintColor={theme.textSecondary} size={24} />
+                  <Ionicons name="close-circle" color={theme.textSecondary} size={26} />
                 </TouchableOpacity>
               </View>
 
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={styles.modalInputWrapper}>
-                  <ThemedText style={styles.modalInputLabel}>Habit Name</ThemedText>
+                  <ThemedText style={styles.modalInputLabel}>HABIT NAME</ThemedText>
                   <TextInput
                     style={[styles.modalTextInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
                     value={editName}
@@ -405,9 +544,8 @@ export default function HabitsScreen() {
                   />
                 </View>
 
-                {/* Emojis selection */}
                 <View style={styles.modalInputWrapper}>
-                  <ThemedText style={styles.modalInputLabel}>Emoji Icon</ThemedText>
+                  <ThemedText style={styles.modalInputLabel}>ICON & COLOR</ThemedText>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
                     {EMOJI_OPTIONS.map((emoji) => (
                       <TouchableOpacity
@@ -422,11 +560,7 @@ export default function HabitsScreen() {
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
-                </View>
 
-                {/* Colors selection */}
-                <View style={styles.modalInputWrapper}>
-                  <ThemedText style={styles.modalInputLabel}>Theme Color</ThemedText>
                   <View style={styles.colorPalette}>
                     {COLOR_OPTIONS.map((color) => (
                       <TouchableOpacity
@@ -442,9 +576,8 @@ export default function HabitsScreen() {
                   </View>
                 </View>
 
-                {/* Target */}
                 <View style={styles.modalInputWrapper}>
-                  <ThemedText style={styles.modalInputLabel}>Goal Target & Unit</ThemedText>
+                  <ThemedText style={styles.modalInputLabel}>GOAL TARGET & UNIT</ThemedText>
                   <View style={styles.targetRow}>
                     <TextInput
                       style={[styles.modalTextInput, styles.targetValueInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
@@ -460,9 +593,8 @@ export default function HabitsScreen() {
                   </View>
                 </View>
 
-                {/* Frequency */}
                 <View style={styles.modalInputWrapper}>
-                  <ThemedText style={styles.modalInputLabel}>Frequency</ThemedText>
+                  <ThemedText style={styles.modalInputLabel}>FREQUENCY</ThemedText>
                   <View style={styles.segmentedControl}>
                     {(['daily', 'weekdays', 'custom'] as const).map((type) => (
                       <TouchableOpacity
@@ -514,9 +646,8 @@ export default function HabitsScreen() {
                   )}
                 </View>
 
-                {/* Reminder time */}
                 <View style={styles.modalInputWrapper}>
-                  <ThemedText style={styles.modalInputLabel}>Reminder Time</ThemedText>
+                  <ThemedText style={styles.modalInputLabel}>REMINDER TIME</ThemedText>
                   <TextInput
                     style={[styles.modalTextInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
                     value={editReminderTime}
@@ -524,7 +655,6 @@ export default function HabitsScreen() {
                   />
                 </View>
 
-                {/* Save button */}
                 <TouchableOpacity
                   style={[styles.modalSaveButton, { backgroundColor: editColor }]}
                   onPress={handleSaveEdit}
@@ -559,6 +689,48 @@ const styles = StyleSheet.create({
     marginTop: Spacing.half,
     fontWeight: '500',
   },
+  searchContainer: {
+    paddingHorizontal: Spacing.four,
+    marginBottom: Spacing.two,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 46,
+    borderRadius: 14,
+    paddingHorizontal: Spacing.three,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    padding: 0, // Remove Android padding
+  },
+  filterChipsScroll: {
+    marginBottom: Spacing.two,
+  },
+  filterScrollContent: {
+    paddingHorizontal: Spacing.four,
+    gap: Spacing.two,
+  },
+  filterChip: {
+    paddingVertical: Spacing.one + 2,
+    paddingHorizontal: Spacing.three,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterChipActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   scrollContent: {
     paddingHorizontal: Spacing.four,
     paddingBottom: BottomTabInset + Spacing.six,
@@ -571,22 +743,23 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.four,
   },
   habitCard: {
-    borderRadius: 24,
+    borderRadius: 22,
     padding: Spacing.four,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.02,
     shadowRadius: 6,
     elevation: 1,
+    gap: Spacing.three,
   },
-  cardMainRow: {
+  cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   iconWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: 46,
+    height: 46,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -609,117 +782,165 @@ const styles = StyleSheet.create({
   },
   bullet: {
     fontSize: 12,
+    marginHorizontal: 2,
   },
   freqText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
+  },
+  cardProgressSection: {
+    gap: Spacing.one,
+  },
+  progressLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  progressBarBg: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(148, 163, 184, 0.12)',
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.one,
   },
   streakIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(249, 115, 22, 0.06)',
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    borderRadius: 12,
-    marginVertical: Spacing.three,
-    gap: Spacing.two,
+    backgroundColor: 'rgba(249, 115, 22, 0.05)',
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    borderRadius: 8,
+    gap: Spacing.one,
   },
   streakLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#9a3412',
-    flex: 1,
-  },
-  streakValue: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '700',
     color: '#ea580c',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   buttonsGroup: {
     flexDirection: 'row',
     gap: Spacing.two,
   },
   actionButton: {
-    flexDirection: 'row',
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: Spacing.one,
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.two,
-    borderRadius: 8,
     backgroundColor: 'rgba(148, 163, 184, 0.08)',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   deleteButton: {
     backgroundColor: 'rgba(239, 68, 68, 0.08)',
   },
-  actionBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  formCard: {
+  fab: {
+    position: 'absolute',
+    bottom: BottomTabInset + Spacing.four,
+    right: Spacing.four,
+    width: 56,
+    height: 56,
     borderRadius: 28,
-    padding: Spacing.four,
-    marginTop: Spacing.two,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  formHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.three,
-  },
-  formTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  formSubTitle: {
-    fontSize: 12,
-    marginTop: Spacing.half,
-    fontWeight: '500',
-  },
-  fabPlus: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    gap: Spacing.two,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: Spacing.one,
+  },
+  emptySubtitle: {
+    textAlign: 'center',
+    fontSize: 13,
+    maxWidth: 260,
+    lineHeight: 18,
+    marginBottom: Spacing.three,
+  },
+  emptyCTA: {
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.four,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
-  inputsGrid: {
-    gap: Spacing.three,
-  },
-  formRow: {
-    flexDirection: 'row',
-    gap: Spacing.three,
-  },
-  inputWrapper: {
-    flex: 1,
-  },
-  inputLabel: {
-    fontSize: 12,
+  emptyCTAText: {
+    fontSize: 13,
     fontWeight: '700',
-    marginBottom: Spacing.one,
   },
-  textInput: {
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: Spacing.four,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.four,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  modalInputWrapper: {
+    marginBottom: Spacing.three,
+  },
+  modalInputLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748b',
+    marginBottom: Spacing.one + 2,
+    letterSpacing: 0.5,
+  },
+  modalTextInput: {
     height: 48,
     borderWidth: 1.5,
     borderRadius: 14,
     paddingHorizontal: Spacing.three,
     fontSize: 14,
     fontWeight: '600',
+  },
+  modalSaveButton: {
+    height: 52,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: Spacing.three,
+    marginBottom: Spacing.four,
+  },
+  saveBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
   },
   targetRow: {
     flexDirection: 'row',
@@ -732,19 +953,16 @@ const styles = StyleSheet.create({
   targetUnitInput: {
     flex: 1,
   },
-  emojiColorSection: {
-    gap: Spacing.one,
-  },
-  horizontalScroll: {
-    paddingVertical: Spacing.one,
-    gap: Spacing.two,
-  },
   emojiPickerItem: {
     width: 40,
     height: 40,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  horizontalScroll: {
+    paddingVertical: Spacing.one,
+    gap: Spacing.two,
   },
   colorPalette: {
     flexDirection: 'row',
@@ -806,56 +1024,5 @@ const styles = StyleSheet.create({
   dayText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    padding: Spacing.four,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.four,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  modalInputWrapper: {
-    marginBottom: Spacing.three,
-  },
-  modalInputLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-    marginBottom: Spacing.one,
-  },
-  modalTextInput: {
-    height: 48,
-    borderWidth: 1.5,
-    borderRadius: 14,
-    paddingHorizontal: Spacing.three,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  modalSaveButton: {
-    height: 52,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: Spacing.three,
-    marginBottom: Spacing.four,
-  },
-  saveBtnText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
   },
 });

@@ -11,6 +11,8 @@
       "icon": "./assets/images/icon.png"
     },
     "android": {
+      "package": "com.ank09yadav.bitracker",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -34,11 +36,18 @@
             "imageWidth": 76
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c43ddfb2-0dea-437f-84fb-f4020628aa79"
+      }
     }
   }
 }

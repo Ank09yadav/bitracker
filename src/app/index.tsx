@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   StyleSheet,
   ScrollView,
   Pressable,
   View,
-  Modal,
-  TextInput,
   TouchableOpacity,
   Platform
 } from 'react-native';
@@ -13,25 +11,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import Svg, { Circle } from 'react-native-svg';
+import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme, useActiveColorScheme } from '@/hooks/use-theme';
-import { useHabits, getLocalDateString, isHabitScheduledOnDate, calculateStreak } from '@/context/habits-context';
+import { useActiveColorScheme } from '@/hooks/use-theme';
+import { useHabits, getLocalDateString, isHabitScheduledOnDate } from '@/context/habits-context';
 
 export default function TodayScreen() {
-  const { habits, settings, toggleHabitComplete, updateHabitProgress, updateSettings } = useHabits();
-  const theme = useTheme();
+  const { habits, settings, toggleHabitComplete } = useHabits();
   const scheme = useActiveColorScheme();
+  const router = useRouter();
   
-  const handleToggleTheme = () => {
-    const nextTheme = settings.theme === 'light' ? 'dark' : 'light';
-    updateSettings({ theme: nextTheme });
-  };
-  
-  const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
-  const [progressInput, setProgressInput] = useState<string>('');
+
 
   const todayStr = getLocalDateString();
   const todayDate = new Date();
@@ -56,26 +49,6 @@ export default function TodayScreen() {
     if (hr < 17) return 'Good Afternoon';
     return 'Good Evening';
   };
-
-  // Open modal for modifying progress
-  const openProgressModal = (habitId: string) => {
-    const habit = habits.find((h) => h.id === habitId);
-    if (!habit) return;
-    const currentProgress = habit.history[todayStr]?.progress || 0;
-    setSelectedHabitId(habitId);
-    setProgressInput(currentProgress.toString());
-  };
-
-  const handleSaveProgress = () => {
-    if (!selectedHabitId) return;
-    const value = parseInt(progressInput, 10);
-    if (!isNaN(value)) {
-      updateHabitProgress(selectedHabitId, todayStr, value);
-    }
-    setSelectedHabitId(null);
-  };
-
-  const activeHabit = habits.find((h) => h.id === selectedHabitId);
 
   // SVG Progress Arc calculation
   const circleSize = 130;
@@ -102,20 +75,14 @@ export default function TodayScreen() {
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleToggleTheme}
-              style={[styles.themeToggleBtn, { backgroundColor: theme.backgroundElement }]}
+              activeOpacity={0.8}
+              onPress={() => router.navigate('/profile' as any)}
             >
-              <SymbolView
-                name={scheme === 'dark' ? 'sun.max.fill' : 'moon.fill'}
-                tintColor={theme.text}
-                size={20}
+              <Image
+                source={{ uri: settings.profile.avatar }}
+                style={styles.avatar}
               />
             </TouchableOpacity>
-            <Image
-              source={{ uri: settings.profile.avatar }}
-              style={styles.avatar}
-            />
           </View>
         </View>
 
@@ -160,15 +127,17 @@ export default function TodayScreen() {
 
             <View style={styles.summaryTextContainer}>
               <View style={styles.badge}>
-                <SymbolView name="sparkles" tintColor="#eab308" size={12} />
+                <SymbolView name={habits.length > 0 ? "sparkles" : "hand.wave.fill"} tintColor="#eab308" size={12} />
                 <ThemedText type="code" style={styles.badgeText}>
-                  Keep the momentum going
+                  {habits.length > 0 ? "Keep the momentum going" : "Get Started"}
                 </ThemedText>
               </View>
               <ThemedText themeColor="textSecondary" style={styles.summaryText}>
-                {completionRate === 100
-                  ? "Perfect day! You have completed all scheduled habits. Great job!"
-                  : `You are building a strong streak. Complete your remaining habits to close the day with a win.`}
+                {habits.length === 0
+                  ? "Welcome! Create your first habit in the Habits tab to start tracking your progress."
+                  : (completionRate === 100
+                    ? "Perfect day! You have completed all scheduled habits. Great job!"
+                    : `You are building a strong streak. Complete your remaining habits to close the day with a win.`)}
               </ThemedText>
             </View>
           </ThemedView>
@@ -177,12 +146,12 @@ export default function TodayScreen() {
           <View style={styles.habitsList}>
             {todayHabits.map((habit) => {
               const record = habit.history[todayStr] || { progress: 0, completed: false };
-              const { currentStreak } = calculateStreak(habit, todayStr);
+              const currentStreak = habit.streakCount ?? 0;
               
               return (
                 <Pressable
                   key={habit.id}
-                  onPress={() => openProgressModal(habit.id)}
+                  onPress={() => router.navigate(`/habit/${habit.id}` as any)}
                   style={({ pressed }) => [
                     styles.habitCard,
                     { backgroundColor: scheme === 'dark' ? '#1c1d20' : '#f8f9fa' },
@@ -238,75 +207,6 @@ export default function TodayScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Progress Adjustment Modal */}
-      {activeHabit && (
-        <Modal
-          visible={selectedHabitId !== null}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setSelectedHabitId(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <ThemedView type="background" style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <ThemedText style={styles.modalTitle}>Update Progress</ThemedText>
-                <TouchableOpacity onPress={() => setSelectedHabitId(null)}>
-                  <SymbolView name="xmark.circle.fill" tintColor={theme.textSecondary} size={24} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.modalBody}>
-                <View style={[styles.modalIconContainer, { backgroundColor: activeHabit.color + '20' }]}>
-                  <ThemedText style={styles.modalEmoji}>{activeHabit.icon}</ThemedText>
-                </View>
-                <ThemedText style={styles.modalHabitName}>{activeHabit.name}</ThemedText>
-                <ThemedText themeColor="textSecondary" style={styles.modalTargetText}>
-                  Target: {activeHabit.progressTarget} {activeHabit.progressUnit}
-                </ThemedText>
-
-                <View style={styles.counterRow}>
-                  <TouchableOpacity
-                    style={styles.counterButton}
-                    onPress={() => {
-                      const val = Math.max(0, parseInt(progressInput, 10) - 1);
-                      setProgressInput(val.toString());
-                    }}
-                  >
-                    <ThemedText style={styles.counterBtnText}>-</ThemedText>
-                  </TouchableOpacity>
-
-                  <TextInput
-                    style={[styles.modalInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
-                    keyboardType="number-pad"
-                    value={progressInput}
-                    onChangeText={setProgressInput}
-                    selectTextOnFocus
-                  />
-
-                  <TouchableOpacity
-                    style={styles.counterButton}
-                    onPress={() => {
-                      const val = parseInt(progressInput, 10) + 1;
-                      setProgressInput(val.toString());
-                    }}
-                  >
-                    <ThemedText style={styles.counterBtnText}>+</ThemedText>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={[styles.modalSaveButton, { backgroundColor: activeHabit.color }]}
-                    onPress={handleSaveProgress}
-                  >
-                    <ThemedText style={styles.saveBtnText}>Save Progress</ThemedText>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </ThemedView>
-          </View>
-        </Modal>
-      )}
     </ThemedView>
   );
 }
