@@ -11,6 +11,9 @@
 BiTracker is a high-fidelity habit tracking platform designed to help users build consistency and track daily momentum. Running natively on **iOS**, **Android**, and the **Web** from a single codebase, BiTracker incorporates smooth UI micro-animations, customizable schedules, detailed metrics with monthly GitHub-style heatmaps, dark/light theme switching, and local notifications.
 
 ---
+<br>
+## Video : 
+[video]:{https://youtube.com/shorts/8kss9rhqnAM?feature=share} 
 
 ## 🗺️ Table of Contents
 1. [System Architecture](#-system-architecture)
@@ -261,3 +264,10 @@ Since BiTracker uses React Native AsyncStorage, you can clear data by:
 BiTracker uses custom CSS variables (like `--font-display`, `--font-rounded`) coupled with custom components like `ThemedView` and `ThemedText` to handle light/dark configurations. Ensure styling conforms to the layouts inside `src/constants/theme.ts`.
 
 ---
+<br>
+screenshots: 
+<img width="720" height="1600" alt="WhatsApp Image 2026-07-06 at 22 18 15" src="https://github.com/user-attachments/assets/ae7bc850-eebb-444e-9667-780d7992aa1b" />
+<img width="720" height="1600" alt="WhatsApp Image 2026-07-06 at 22 18 15(1)" src="https://github.com/user-attachments/assets/a8817e2e-98f3-4e53-b06f-8e3ae758e168" />
+<img width="720" height="1600" alt="WhatsApp Image 2026-07-06 at 22 18 16(1)" src="https://github.com/user-attachments/assets/5ceb951a-ab0b-48e0-8679-6e2696e76591" />
+<img width="720" height="1600" alt="WhatsApp Image 2026-07-06 at 22 18 15(2)" src="https://github.com/user-attachments/assets/dddafc3f-f7d7-4763-9bda-624f39026ad9" />
+<img width="720" height="1600" alt="WhatsApp Image 2026-07-06 at 22 18 16" src="https://github.com/user-attachments/assets/301e2d9e-df0b-4465-b471-bc96332f339d" />
